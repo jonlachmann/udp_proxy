@@ -1,7 +1,13 @@
+#include "UdpSimulator.h"
 #include <iostream>
+#include <boost/asio.hpp>
+
+void run_io_context(boost::asio::io_context& io_context) {
+    io_context.run();
+}
 
 int main() {
-    io_context ioContext;
+    boost::asio::io_context ioContext;
 
     // Define local and remote endpoints
     udp::endpoint localEndpoint(ip::address::from_string("127.0.0.1"), 12345);
@@ -11,7 +17,9 @@ int main() {
     UDPSimulator udpSimulator(ioContext, localEndpoint, remoteEndpoint);
     udpSimulator.start();
 
-    ioContext.run();
+    // Start io_context.run() in a separate thread
+    std::thread io_thread(run_io_context, std::ref(ioContext));
 
+    io_thread.join();
     return 0;
 }
