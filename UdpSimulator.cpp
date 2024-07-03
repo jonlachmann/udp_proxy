@@ -28,6 +28,13 @@ void UDPSimulator::startProxy() {
 
 // Receive packages from clients and queue them for forwarding to the server
 void UDPSimulator::receiveLocal() {
+    std::cout << "\033[2J\033[1;1H";
+    std::cout << "UDP lag/latency/drop simulation proxy running!" << std::endl;
+    std::cout << "Latency: " << latencyMs_ << "ms" << std::endl;
+    std::cout << "Jitter: " << jitterMs_ << "ms" << std::endl;
+    std::cout << "Drop probability: " << dropRate_ << "" << std::endl;
+    std::cout << "Dropped/Total: " << drop_count << "/" << package_count << std::endl;
+
     udp::endpoint receive_endpoint;
     long packetId = ++lastPacket;
     packets[packetId] = packet_info();
@@ -87,6 +94,7 @@ void UDPSimulator::receiveRemote(std::shared_ptr<client_info> &client) {
 // Forward a package from the server to the respective client
 void UDPSimulator::sendToClient(long packetId, std::shared_ptr<client_info> &client) {
     // Forward data to a known client
+    package_count++;
     localSocket_.async_send_to(buffer(packets[packetId].data, packets[packetId].bytes), client->client_to_proxy,
                                 [this, packetId, &client](const boost::system::error_code &ec, std::size_t) {
         if (verbose) std::cout << "Sent id: " << packetId << " to client from over endpoint: " << client->client_to_proxy << std::endl;
@@ -106,6 +114,7 @@ void UDPSimulator::sendToServer(long packetId, const std::string &address, int p
     }
 
     // Forward data to the server
+    package_count++;
     clients[endpoint]->proxy_to_server.async_send_to(buffer(packets[packetId].data, packets[packetId].bytes), remoteEndpoint_,
                                                      [this, packetId, endpoint](const boost::system::error_code&, std::size_t) {
                                                          if (verbose) std::cout << "Sent id: " << packetId << " to server from: " << clients[endpoint]->proxy_to_server.local_endpoint() << " to: " << remoteEndpoint_ << std::endl;
@@ -123,6 +132,8 @@ int UDPSimulator::getJitter() {
 // Draw from the package drop distribution
 bool UDPSimulator::shouldDrop() {
     std::uniform_real_distribution<double> dropDistribution(0.0, 1.0);
-    double dropProbability = dropDistribution(randomGenerator_);
-    return dropProbability < dropRate_;
+    double drop_probability = dropDistribution(randomGenerator_);
+    bool should_drop = drop_probability < dropRate_;
+    if (should_drop) drop_count++;
+    return should_drop;
 }

@@ -16,7 +16,6 @@ int main(int argc, char* argv[]) {
     int jitter = std::stoi(argv[5]);
     double drop_rate = std::stod(argv[6]);
 
-
     boost::asio::io_context io_context;
 
     // Define local and remote endpoints

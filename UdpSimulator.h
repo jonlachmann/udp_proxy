@@ -32,6 +32,10 @@ public:
 
     void startProxy();
 
+    // Logging parameters
+    long drop_count = 0;
+    long package_count = 0;
+
 private:
     void receiveLocal();
     void receiveRemote(std::shared_ptr<client_info> &client);
