@@ -2,24 +2,32 @@
 #include <iostream>
 #include <boost/asio.hpp>
 
-void run_io_context(boost::asio::io_context& io_context) {
-    io_context.run();
-}
+int main(int argc, char* argv[]) {
+    if (argc != 7)
+    {
+        std::cerr << "usage: udp_proxy <local port> <forward host ip> <forward port> <latency> <jitter> <drop_rate>" << std::endl;
+        return 1;
+    }
 
-int main() {
-    boost::asio::io_context ioContext;
+    unsigned short local_port = static_cast<unsigned short>(std::stoul(argv[1]));
+    std::string forward_host = argv[2];
+    unsigned short forward_port = static_cast<unsigned short>(std::stoul(argv[3]));
+    int latency = std::stoi(argv[4]);
+    int jitter = std::stoi(argv[5]);
+    double drop_rate = std::stod(argv[6]);
+
+
+    boost::asio::io_context io_context;
 
     // Define local and remote endpoints
-    udp::endpoint localEndpoint(ip::address::from_string("127.0.0.1"), 12345);
-    udp::endpoint remoteEndpoint(ip::address::from_string("127.0.0.1"), 54321);
+    udp::endpoint localEndpoint(ip::address::from_string("127.0.0.1"), local_port);
+    udp::endpoint remoteEndpoint(ip::address::from_string(forward_host), forward_port);
 
     // Create and start the UDP simulator
-    UDPSimulator udpSimulator(ioContext, localEndpoint, remoteEndpoint);
-    udpSimulator.start();
+    UDPSimulator udp_simulator(latency, jitter, drop_rate, io_context, localEndpoint, remoteEndpoint);
+    udp_simulator.startProxy();
 
-    // Start io_context.run() in a separate thread
-    std::thread io_thread(run_io_context, std::ref(ioContext));
+    io_context.run();
 
-    io_thread.join();
     return 0;
 }
