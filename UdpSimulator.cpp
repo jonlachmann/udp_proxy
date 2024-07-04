@@ -76,10 +76,10 @@ void UDPSimulator::receiveRemote(std::shared_ptr<client_info> &client) {
            if (!error && bytesReceived > 0) {
                packets[packetId].bytes = bytesReceived;
                int delay = latencyMs_ + getJitter();
-               boost::asio::steady_timer timer = boost::asio::steady_timer(
+               auto timer = std::make_shared<boost::asio::steady_timer>(
                        io_ctx, boost::asio::chrono::milliseconds(delay));
                if (!shouldDrop()) {
-                   timer.async_wait([this, &client, packetId](const boost::system::error_code &ec) {
+                   timer->async_wait([this, &client, packetId, timer](const boost::system::error_code &ec) {
                        sendToClient(packetId, client);
                    });
                }
