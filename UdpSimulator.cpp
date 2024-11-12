@@ -35,19 +35,19 @@ void UDPSimulator::receiveLocal() {
     std::cout << "Drop probability: " << dropRate_ << "" << std::endl;
     std::cout << "Dropped/Total: " << drop_count << "/" << package_count << std::endl;
 
-    udp::endpoint receive_endpoint;
+    auto receive_endpoint_ptr = std::make_shared<udp::endpoint>();
     long packetId = ++lastPacket;
     packets[packetId] = packet_info();
-    localSocket_.async_receive_from(buffer(packets[packetId].data, packets[packetId].data.size()), receive_endpoint,
-        [this, &receive_endpoint, packetId](const boost::system::error_code &error, std::size_t bytesReceived) {
+    localSocket_.async_receive_from(buffer(packets[packetId].data, packets[packetId].data.size()), *receive_endpoint_ptr,
+        [this, receive_endpoint_ptr, packetId](const boost::system::error_code &error, std::size_t bytesReceived) {
             if (!error && bytesReceived > 0) {
                 packets[packetId].bytes = bytesReceived;
                 if (!shouldDrop()) {
-                    std::string address = receive_endpoint.address().to_string();
-                    int port = receive_endpoint.port();
+                    std::string address = receive_endpoint_ptr->address().to_string();
+                    int port = receive_endpoint_ptr->port();
                     int delay = latencyMs_ + getJitter();
-                    auto timer = std::make_shared<boost::asio::steady_timer>(io_ctx,
-                                                                                boost::asio::chrono::milliseconds(
+                    auto timer = std::make_shared<steady_timer>(io_ctx,
+                                                                                milliseconds(
                                                                                         delay));
                     timer->async_wait([this, packetId, address, port, timer](const boost::system::error_code &ec) {
                         sendToServer(packetId, address, port);
@@ -76,8 +76,8 @@ void UDPSimulator::receiveRemote(std::shared_ptr<client_info> &client) {
            if (!error && bytesReceived > 0) {
                packets[packetId].bytes = bytesReceived;
                int delay = latencyMs_ + getJitter();
-               auto timer = std::make_shared<boost::asio::steady_timer>(
-                       io_ctx, boost::asio::chrono::milliseconds(delay));
+               auto timer = std::make_shared<steady_timer>(
+                       io_ctx, milliseconds(delay));
                if (!shouldDrop()) {
                    timer->async_wait([this, &client, packetId, timer](const boost::system::error_code &ec) {
                        sendToClient(packetId, client);
