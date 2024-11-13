@@ -8,16 +8,16 @@ using namespace boost::asio;
 using ip::udp;
 using std::chrono::milliseconds;
 
-UDPSimulator::UDPSimulator(int latency, int jitter, double dropRate, io_context& io_ctx, const udp::endpoint& localEndpoint, const udp::endpoint& remoteEndpoint, bool verbose)
-            : latencyMs_(latency),
-              jitterMs_(jitter),
-              dropRate_(dropRate),
+UDPSimulator::UDPSimulator(const int latency, const int jitter, const double dropRate, io_context& io_ctx, const udp::endpoint& localEndpoint, const udp::endpoint& remoteEndpoint, const bool verbose)
+            : io_ctx(io_ctx),
               localSocket_(io_ctx),
               remoteEndpoint_(remoteEndpoint),
               localEndpoint_(localEndpoint),
-              io_ctx(io_ctx),
-              verbose(verbose),
-              randomGenerator_(std::random_device()()) { }
+              latencyMs_(latency),
+              jitterMs_(jitter),
+              dropRate_(dropRate),
+              randomGenerator_(std::random_device()()),
+              verbose(verbose) { }
 
 // Start the proxy server, bind to the address and start receiving data
 void UDPSimulator::startProxy() {
@@ -39,17 +39,17 @@ void UDPSimulator::receiveLocal() {
     long packetId = ++lastPacket;
     packets[packetId] = packet_info();
     localSocket_.async_receive_from(buffer(packets[packetId].data, packets[packetId].data.size()), *receive_endpoint_ptr,
-        [this, receive_endpoint_ptr, packetId](const boost::system::error_code &error, std::size_t bytesReceived) {
+        [this, receive_endpoint_ptr, packetId](const boost::system::error_code &error, const std::size_t bytesReceived) {
             if (!error && bytesReceived > 0) {
                 packets[packetId].bytes = bytesReceived;
                 if (!shouldDrop()) {
                     std::string address = receive_endpoint_ptr->address().to_string();
-                    int port = receive_endpoint_ptr->port();
-                    int delay = latencyMs_ + getJitter();
+                    const int port = receive_endpoint_ptr->port();
+                    const int delay = latencyMs_ + getJitter();
                     auto timer = std::make_shared<steady_timer>(io_ctx,
                                                                                 milliseconds(
                                                                                         delay));
-                    timer->async_wait([this, packetId, address, port, timer](const boost::system::error_code &ec) {
+                    timer->async_wait([this, packetId, address, port, timer](const boost::system::error_code &) {
                         sendToServer(packetId, address, port);
                     });
                 }
@@ -61,7 +61,7 @@ void UDPSimulator::receiveLocal() {
 }
 
 // Add new clients to the clients table, keeping track of "connections"
-void UDPSimulator::connectClient(std::string &endpoint, const std::string &address, int port) {
+void UDPSimulator::connectClient(std::string &endpoint, const std::string &address, const int port) {
     clients.emplace(endpoint, std::make_shared<client_info>(client_info(io_ctx, address, port)));
     clients[endpoint]->proxy_to_server.open(udp::v4());
 }
@@ -103,11 +103,10 @@ void UDPSimulator::sendToClient(long packetId, std::shared_ptr<client_info> &cli
 }
 
 // Forward a package from a client to the server, adding new clients and opening a socket to receive on
-void UDPSimulator::sendToServer(long packetId, const std::string &address, int port) {
+void UDPSimulator::sendToServer(long packetId, const std::string &address, const int port) {
     // Add or create mapping from client to server and vice versa
     std::string endpoint = address + ":" + std::to_string(port);
-    bool new_client = clients.find(endpoint) == clients.end();
-    if (new_client) {
+    if (clients.find(endpoint) == clients.end()) {
         connectClient(endpoint, address, port);
         if (verbose) std::cout << "New client saved with client to proxy endpoint: " << endpoint << std::endl;
         receiveRemote(clients[endpoint]);
@@ -124,16 +123,16 @@ void UDPSimulator::sendToServer(long packetId, const std::string &address, int p
 
 // Draw random jitter from the jitter distribution
 int UDPSimulator::getJitter() {
-    std::uniform_int_distribution<int> jitterDistribution(0, jitterMs_ * 2);
-    int jitter = jitterDistribution(randomGenerator_);
+    std::uniform_int_distribution jitterDistribution(0, jitterMs_ * 2);
+    const int jitter = jitterDistribution(randomGenerator_);
     return jitter;
 }
 
 // Draw from the package drop distribution
 bool UDPSimulator::shouldDrop() {
-    std::uniform_real_distribution<double> dropDistribution(0.0, 1.0);
-    double drop_probability = dropDistribution(randomGenerator_);
-    bool should_drop = drop_probability < dropRate_;
+    std::uniform_real_distribution dropDistribution(0.0, 1.0);
+    const double drop_probability = dropDistribution(randomGenerator_);
+    const bool should_drop = drop_probability < dropRate_;
     if (should_drop) drop_count++;
     return should_drop;
 }
